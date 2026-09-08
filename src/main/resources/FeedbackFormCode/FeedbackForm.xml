@@ -164,9 +164,20 @@
 #macro(submitFeedback)
   $response.setContentType('application/json')
   #set ($type = $request.type)
-  #set ($feedbackTypeObj = $xwiki.getDocumentAsAuthor($type).getObject("FeedbackFormCode.FeedbackTypeClass"))
+  #if (!$xwiki.getDocumentAsAuthor("FeedbackFormCode.Configuration").getValue("publicFeedbackTypes").contains($type))
+    {"status": false, "message": "Error: this feedback type is not enabled."}
+    #break
+  #end
+  #set ($feedbackTypeDoc = $xwiki.getDocumentAsAuthor($type))
+  #set ($feedbackTypeObj = $feedbackTypeDoc.getObject("FeedbackFormCode.FeedbackTypeClass"))
   #if (!$!feedbackTypeObj)
     {"status": false, "message": "Error: Wrong feedback type."}
+    #break
+  #end
+  #set ($validateAndCustomizeSubmission = $feedbackTypeObj.getValue("validateAndCustomizeSubmission"))
+  #set ($feedbackTypeAuthor = $feedbackTypeDoc.authors.effectiveMetadataAuthor)
+  #if ("$!validateAndCustomizeSubmission" != '' &amp;&amp; !$services.security.authorization.hasAccess('admin', $feedbackTypeAuthor, $services.model.createWikiReference($services.wiki.currentWikiId)))
+    {"status": false, "message": "Error: the feedback type author doesn't have admin right."}
     #break
   #end
   #set ($shortType = $feedbackTypeObj.getValue("type"))
@@ -184,7 +195,6 @@
   $feedbackMetadata.set("emailsRecipients", [$feedbackRecipientEmail])
   $feedbackMetadata.set("usersRecipients", [])
   #set ($discard = $feedbackDoc.addObjectFromRequest($type))
-  #set ($validateAndCustomizeSubmission = $feedbackTypeObj.getValue("validateAndCustomizeSubmission"))
   #if ("$!validateAndCustomizeSubmission" != "")
     #evaluate($validateAndCustomizeSubmission)
   #end
@@ -244,13 +254,13 @@
   {{html clean=false wiki=true}}##
   &lt;div
     id="feedback-modal-body-root"
-    data-suggest-sending-browser-env="$typeConfig.getValue('suggestSendingBrowserEnv')"
-    data-send-url="$typeConfig.getValue('sendURL')"
-    data-allowed-file-upload-max-number="$typeConfig.getValue('allowedFileUploadMaxNumber')"
-    data-allowed-file-upload-max-size="$typeConfig.getValue('allowedFileUploadMaxSize')"
-    data-allowed-file-upload-types="$stringtool.join($typeConfig.getValue('allowedFileUploadTypes'), ',')"
-    data-file-upload-required="$typeConfig.getValue('fileUploadRequired')"
-  &gt;{{display reference="$typeSheet" /}}&lt;/div&gt;##
+    data-suggest-sending-browser-env="$escapetool.xml($typeConfig.getValue('suggestSendingBrowserEnv'))"
+    data-send-url="$escapetool.xml($typeConfig.getValue('sendURL'))"
+    data-allowed-file-upload-max-number="$escapetool.xml($typeConfig.getValue('allowedFileUploadMaxNumber'))"
+    data-allowed-file-upload-max-size="$escapetool.xml($typeConfig.getValue('allowedFileUploadMaxSize'))"
+    data-allowed-file-upload-types="$escapetool.xml($stringtool.join($typeConfig.getValue('allowedFileUploadTypes'), ','))"
+    data-file-upload-required="$escapetool.xml($typeConfig.getValue('fileUploadRequired'))"
+  &gt;{{display reference="$services.rendering.escape($typeSheet, 'xwiki/2.1')" /}}&lt;/div&gt;##
   {{/html}}
 #elseif($action == 'submit')
   #submitFeedback()
